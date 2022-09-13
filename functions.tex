@@ -1,0 +1,101 @@
+\catcode`@=11
+
+\let\@xp=\expandafter
+
+\def\@nul{\noexpand\@nul}
+\def\@xlet#1#2{\@xp\let\@xp#1#2}
+\def\@afterfi#1\fi{\fi#1}
+\def\@tofi#1#2\fi{\fi#1}
+\def\@gobble#1{}
+
+\def\literal{\afterassignment\@tpp@temp \def\@tpp@temp}
+\def\m@strip{\@xp\@gobble\string}
+
+\def\@prepeat#1#2#3{%
+    \unless\ifnum#1>#2 %
+        \afterfi#3{#1}%
+        \@xp\@prepeat\@xp{\the\numexpr #1+1\relax}{#2}{#3}%
+    \fi%
+}
+
+\def\prepeat#1#2{\@prepeat{1}{#1}{#2}}
+
+% Construct an empty primitive array
+% @param #1:    The name of the array
+\def\p@array#1{\@xp\def\csname p@array@#1\endcsname{}}
+
+\def\@p@array@init#1#2,{%
+    \def\@p@init@temp{#2}%
+    \ifx\empty\@p@init@temp %
+    \else%
+        \@afterfi\p@array@pushback{#1}{#2}%
+        \@p@array@init{#1}%
+    \fi% 
+}
+
+% Construct and initialize a primitive array
+% @param #1:    The name of the array
+% @param #2:    The values to initialize the array with
+\def\p@array@init#1#2{%
+    \p@array{#1}%
+    \@p@array@init{#1}#2,,%
+}
+
+% Push an element to the end of a primitive array
+% @param #1:    The name of the array
+% @param #2:    The element to push back
+\def\p@array@pushback#1#2{%
+    \@xlet{\p@array@temp}{\csname p@array@#1\endcsname}%
+    \def\@temp@def{\@xp\def\csname p@array@#1\endcsname}%
+    \@xp\@temp@def\@xp{\p@array@temp\p@exe{#2}}%
+}
+
+% Get the length of a primitive array
+% @param #1:    The name kd the array
+\def\p@array@len#1{{%
+    \count@=0 %
+    \def\p@exe{\advance\count@ by 1}%
+    \csname p@array@#1\endcsname%
+    \xdef\tpp@return{\the\count@}%
+}}
+
+% Get an element at an index in a primitive array
+% @param #1:    The name of the array
+% @param #2:    The index (starting from 0) to get
+% @return:      The element is placed globally in the \tpp@return register.
+%               If the index is out of bounds, the register is let equal to \relax.
+\def\p@array@index#1#2{{%
+    \let\tpp@register=\relax%
+    \count@=0 %
+    \def\p@exe##1{%
+        \ifnum\count@=#2 %
+            \gdef\tpp@return{##1}%
+        \fi%
+        \advance\count@ by 1 %
+    }%
+    \csname p@array@#1\endcsname%
+}}
+
+\def\p@array@foreach#1#2{%
+    \def\p@exe##1{#2{##1}}%
+    \csname p@array@#1\endcsname%
+}
+
+\def\@create@param@list#1{\prepeat{#1}{\literal##1{#####1}}}
+
+\long\def\function#1#2#3{%
+    \p@array@init{\m@strip#1@param@list}{#2}%
+    \def#1##1{%
+        \p@array@init{\m@strip#1@param@call@list}{##1}%
+        \count1=0 %
+        \def\@iterator@temp####1{%
+            \p@array@index{\m@strip#1@param@call@list}{\count1}%
+            \advance\count1 by 1 %
+            \let####1=\tpp@return%
+        }%
+        \let\p@exe=\@iterator@temp%
+        \csname p@array@\m@strip#1@param@list\endcsname%
+        \ignorespaces#3%
+    }%
+}
+
