@@ -91,11 +91,15 @@
         \def\@iterator@temp####1{%
             \p@array@index{\m@strip#1@param@call@list}{\count1}%
             \advance\count1 by 1 %
+            \@xp\let\csname @tpp@old@\m@strip####1\endcsname=####1%
             \let####1=\tpp@return%
         }%
         \let\p@exe=\@iterator@temp%
         \csname p@array@\m@strip#1@param@list\endcsname%
-        \ignorespaces#3%
+        #3%
+        \def\@iterator@temp####1{\@xp\let\@xp####1\csname @tpp@old@\m@strip####1\endcsname}%
+        \let\p@exe=\@iterator@temp%
+        \csname p@array@\m@strip#1@param@list\endcsname%
     }%
 }
 

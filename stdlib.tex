@@ -1,0 +1,66 @@
+\input classes
+
+\class\String
+\method\String::\String{\self,\s}{%
+    \@get@instance@name{\self}%
+    \@xp\edef\csname \tpp@instance@name @str\endcsname{\s}%
+}
+
+\method\String::\print{\self}{%
+    \@get@instance@name{\self}%
+    \csname \tpp@instance@name @str\endcsname%
+}
+
+\operator\String::+{\self,\other}{%
+    \let\old@tpp@instance@name=\tpp@instance@name%
+    \@get@instance@name{\self}%
+    \@xp\edef\csname \tpp@instance@name @str\endcsname{\csname \tpp@instance@name @str\endcsname\csname \old@tpp@instance@name @str\endcsname}%
+}
+
+\operator\String::={\self,\other}{%
+    \let\old@tpp@instance@name=\tpp@instance@name%
+    \@get@instance@name{\self}%
+    \@xp\edef\csname \tpp@instance@name @str\endcsname{\csname \old@tpp@instance@name @str\endcsname}%
+}
+
+\class\Num
+
+\method\Num::\Num{\self,\n}{%
+    \@get@instance@name{\self}%
+    \@xp\edef\csname \tpp@instance@name @num\endcsname{\n}%
+}
+
+\method\Num::\print{\self}{%
+    \@get@instance@name{\self}%
+    \csname \tpp@instance@name @num\endcsname%
+}
+
+\operator\Num::={\self,\other}{%
+    \let\old@tpp@instance@name=\tpp@instance@name%
+    \@get@instance@name{\self}%
+    \@xp\edef\csname \tpp@instance@name @num\endcsname{\csname \old@tpp@instance@name @num\endcsname}%
+}
+
+\def\@num@op@create#1{%
+    \operator\Num::#1{\self,\other}{%
+        \let\old@tpp@instance@name=\tpp@instance@name%
+        \@get@instance@name{\self}%
+        \@xp\edef\csname \tpp@instance@name @num\endcsname{\the\numexpr \csname \tpp@instance@name @num\endcsname #1 \csname \old@tpp@instance@name @num\endcsname\relax}%
+    }
+}
+
+\@num@op@create+
+\@num@op@create*
+\@num@op@create-
+\@num@op@create/
+
+\Num\num{10}
+\Num\mum{20}
+
+\num.\print{}
+
+\num + \mum
+
+\num.\print{}
+
+\end

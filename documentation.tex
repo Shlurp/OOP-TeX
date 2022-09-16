@@ -1,0 +1,331 @@
+\catcode`\@=11
+
+\let\@xp=\expandafter
+
+\def\OoP{\TeX\kern-0.5ex+\kern-1.5ex\raise0.4ex\hbox{+}}
+
+\def\begincenter{\bgroup\leftskip=0pt plus 1fil \rightskip=\leftskip}
+\let\endcenter=\egroup
+
+\def\curr@font{cmtt10 }
+\def\fontuse{\afterassignment\@@ \font\@@}
+\def\scalefont{\fontuse \curr@font scaled }
+
+\def\title#{\bgroup\fontuse cmbx10 scaled 3000 \leftskip=0pt plus 1fil \aftergroup\medskip \rightskip=\leftskip \let\@@=}
+
+\newcount\c@section
+\newcount\c@subsection
+\def\section#1{\medskip\advance\c@section by 1 \c@subsection=0 \bgroup\fontuse cmbx10 scaled 2000 \the\c@section. #1\par\smallskip\egroup}
+\def\subsection#1{\medskip\advance\c@subsection by 1 \bgroup\fontuse cmbx10 scaled 1500 \the\c@section.\the\c@subsection. #1\par\smallskip\egroup}
+
+\chardef\flsash=`\/
+{\catcode`\^^M=\active%
+\gdef\begincode{%
+    \bgroup\everypar={}%
+    \medskip%
+    \setbox0=\vbox\bgroup%
+    \global\dimen69=0pt%
+    \tt%
+    \catcode`\^^M=\active%
+    \def^^M{\egroup\ifnum\wd1>\dimen69 \global\dimen69=\wd1\fi\copy1\setbox1=\hbox\bgroup}%
+    \catcode`\ =\active%
+    \catcode`\{=12%
+    \catcode`\}=12%
+    \catcode`\/=0%
+    \catcode`\\=12%
+    \catcode`\%=12 \setbox1=\hbox\bgroup}}
+\def\endcode{%
+    \egroup\egroup%
+    \hfil\hbox to \dimen69{\box0}\hfil\par%
+    \medskip%
+    \let\@par=\par%
+    \def\par{\@par\egroup}%
+}
+
+\font\manual=manfnt
+
+\def\@beginscare#1{%
+    \bgroup%
+    \everypar{%
+        \setbox0=\hbox{#1}%
+        \hangindent \wd0%
+        \hangafter -2%
+        \leavevmode\llap{\copy0}%
+    }%
+}
+\def\endscare{\par\egroup}
+
+\def\beginscare{\@beginscare{\manual \char127\quad}}
+\def\beginsscare{\@beginscare{\manual \char127 \char127\quad}}
+
+\chardef\lbrace="7B
+\chardef\rbrace="7D
+
+\def\parameter#1{$\langle$#1$\rangle$}
+\def\cparameter#1{$\{\langle$#1$\rangle\}$}
+\def\bparameter#1{$[\langle$#1$\rangle]$}
+
+\parindent=0pt
+\parskip=3pt
+\hoffset=\dimexpr 1.5cm - 1in \relax
+\advance\hsize by -2\hoffset
+\voffset=\hoffset
+\advance\vsize by -2\voffset
+
+\title{Object Oriented \TeX: \OoP\par}
+\hfill \OoP\ {\it v0.0.2}\par
+
+\section{An Introduction}
+
+\OoP\ provides macros which implement object oriented programming in \TeX. Suppose you have the following C++ code:
+
+\begincode
+struct Person {
+    std::string name;
+
+    Person(std::string name) {
+        this->name = name;
+    }
+
+    void print() {
+        printf("My name is %s", this->name);
+    }
+};
+/endcode
+
+(Any suboptimal code design above is intentional ({\fontuse cmss10 ;p}) to demonstrate the similarities between C++ and \OoP.)
+This can be translated into \OoP:
+
+\begincode
+\class\Person
+
+\method\Person::\Person{\self,\n}{%
+    \String\self.\name{\n}%
+}
+
+\method\Person::\print{\self}{%
+    My name is \self.\name.\print{}%
+}
+/endcode
+
+A few key things to note is that: a) the definition of a class occurs ``outside'' of the class body
+(quotation marks because there is no ``class body'' in \OoP), b) methods accept {\it named} parameters
+as opposed to the standard numbered parameters required by \TeX{} and c) while \OoP{} borrow's C++'s
+syntax for declaring member functions of a class, it uses python's method of explicitly passing a
+reference to the object to its methods.
+
+But overall the syntax shouldn't be too exotic for those who are familiar with C++ and python.
+Let's now go over the features that \OoP provides.
+
+\section{\OoP}
+
+\subsection{Functions}
+
+While \OoP{} implements classes and objects, a vital piece of this are functions.
+An \OoP{} function is very similar to a \TeX{} macro and is in fact a simple wrapper around it.
+Functions allow you to name parameters and take an arbitrary number of them.
+For example:
+
+\begincode
+\function\foo{\a,\b}{%
+    The first parameter is \a, and the second is \b%
+}
+
+\foo{Hello,there}
+/endcode
+
+Will output {\tt The first parameter is Hello, and the second is there}.
+
+Functions are not scoped by default (since \TeX's groups provide very minimal scoping, I decided to forgo
+it entirely) and therefore any change inside the function affect the program as a whole.
+But this is not the case for parameters passed to the function, for example:
+
+\begincode
+\def\a{The a macro}
+\foo{First,Second}
+
+\a
+/endcode
+
+Still outputs {\tt The a macro}.
+
+\beginscare
+The way this is implemented is quite simple.
+When you define a function, it creates an array of of the macros you passed it (so in the example above, this array
+would be {\tt\lbrace\string\a, \string\b\rbrace}), let's call this array the {\tt parameter array}.
+It then creates a new macro whose name is the name you passed ({\tt\string\foo}) and prepends code which creates an
+array of the parameters you passed ({\tt\lbrace Hello, there\rbrace}) and then redefines the macros in the {\tt parameter array}
+to be the material you passed the function when calling it.
+Before it redefines each macro, it saves them in a temporary register which it then uses to redefine them to their previous
+state after the code has been executed.
+Due to this, functions should not be recursive, as this would override the register and the macros would not get their original
+definitions after execution.
+Hopefully this will change in the future.
+
+The arrays used here are what I called ``primitive arrays'', or {\tt p@array}s.
+Their implementation is similar to Knuth's implementation in Appendix D of his \TeX book.
+All the code for this can be found in {\tt functions.tex}.
+\endscare
+
+\subsection{Classes and Objects}
+
+Now we get to the meat of this project: the actual object orientation.
+As you probably know (and if you don't you should read up on object oriented programming before reading this manual as it will
+not cover it) objects are instances of what are called {\it classes}.
+So naturally \OoP must implement a method of creating these classes, which it does through the macro {\tt class}.
+
+\hfil{\tt\string\class\ \parameter{class name}}\hfil\par
+
+This creates a class whose name is {\tt\parameter{class name}}, this must be macro token.
+In order to define member functions/methods for a specific class, you must use the {\tt method} macro:
+
+\hfil{\tt\string\method\ \parameter{class name}::\parameter{method name}\cparameter{parameters...}\cparameter{code}}\hfil\par
+
+This will create a method for the class {\tt class name} whose name is {\tt method name} which accepts {\tt parameters...} as
+parameters and executes {\tt code} upon calling.
+{\tt parameters...} must be comma-delimited, and note that it is space-insensitive and the first parameter must refer to a
+reference of the current instance of the class.
+So for example the following is a valid method creation:
+
+\begincode
+\method\Person::\speak{\self,\speech}{%
+    \self.\name >> \speech%
+}
+/endcode
+
+Member variables are not explicitly created in the class body and are instead created inside a method of the object.
+So for examlple if we'd like to create a {\tt Person} instance inside some object's method called {\tt\string\person}
+whose name is ``Fin'' then we can do {\tt\string\Person\string\self.\string\person\lbrace Fin\rbrace} inside an object
+method.
+
+You can also define a constructor for classes by creating a method whose name is the same as the class's.
+For example we can define:
+
+\begincode
+\class\Foo
+
+\method\Foo::\Foo{\self,\f}{%
+    Constructing a Foo instance with parameter \f%
+}
+
+\Foo\foo{bar}
+/endcode
+
+This will output {\tt Constructing a Foo instance with parameter bar}.
+
+\beginscare
+The {\tt\string\class} macro creates a new macro by the name of the instance name passed to it, as well
+as a construction macro for creating new instances of this class.
+For purposes of this explanation, let's suppose this name is {\tt\string\Foo}.
+So {\tt\string\class\string\Foo} will create a macro called {\tt\string\Foo} whose sole job is to initiate
+the construction process for a new {\tt\string\Foo} instance.
+The construction process first gets the name of the instance to create, which may be slightly complicated
+if you have members of members and references.
+For example, suppose you're in an instance {\tt\string\instance}'s method, doing something like:
+\begincode
+\Foo\self.\member.\foo ...
+/endcode
+Must convert this into the ``justified'' name {\tt instance::member::foo}.
+
+As mentioned above, member variables have the form {\tt instance::member}.
+Similarly, member functions are simply functions whose name is of the form {\tt class::method}.
+So a call to {\tt\string\method\string\Foo::\string\bar ...} simply creates a function whose name is
+{\tt Foo::bar}.
+In fact this is equivalent to
+{\tt\string\expandafter\string\function\string\csname\ Foo::bar\string\endcsname\ ...}.
+
+The next step in the comstruction process is the actual construction of the instance.
+As said briefly above, every class has a construction macro which creates new instances.
+Once the program has the justified name of the new instance to be created, it passes the name to the class's
+construction macro.
+The construction macro creates the new instance by defining a new macro whose name is this justified name,
+and then passes a reference of this new instance to the construction method ({\tt\string\Foo::\string\Foo}).
+
+The macro which is created for the instance is a simple macro which just checks the tokens that come after
+it.
+If the macro is followed by a period, then it replaces the call to the name of the instance's member variable
+({\tt\string\foo.\string\member} is replaced by {\tt\string\foo::member}).
+And if the next token is an open brace ({\tt\lbrace}) then it replaces the call to a call to the class's
+method of that name and passes the instance as the first parameter to the method
+({\tt\string\foo.\string\bar\lbrace\rbrace} is replaced by {\tt\string\Foo::bar\lbrace\string\foo\rbrace})
+\endscare
+
+\beginsscare
+Every instance also recongizes another token: {\tt?}.
+This is called the {\it query suffix}.
+If you place query suffix after an instance it will place its actual name into a register called
+{\tt\string\tpp@instance@name}.
+So for example if you have an instance {\tt\string\foo} and you call {\tt\string\foo.\string\bar}, the macro
+{\tt\string\self} will be a reference to {\tt\string\foo}, and without the query suffix you would have no
+way of getting the actual name of the instance.
+So if you were to call {\tt\string\self.\string\member} how would it know what macro to look for?
+So calling {\tt\string\self?} will place {\tt foo} into {\tt\string\tpp@instance@name}, and this can be used
+for lookups.
+A more versatile alternative is to use the {\tt\string\@get@instance@name} macro, which will set
+{\tt\string\tpp@instance@name} to the name of the reference if it doesn't point anywhere (if it is undefined).
+\endscare
+
+Classes also support limited operator overloading using the macro {\tt\string\operator}.
+Its use is identical to the {\tt\string\method} macro but instead of getting a method name it gets an operator
+to overload.
+(For now this operator can only be a single token.)
+
+So for example:
+
+\begincode
+\operator\Foo::+{\self,\other}{%
+    Adding two Foo instances%
+}
+
+\Foo\fooA{}
+\Foo\fooB{}
+
+\fooA + \fooB
+/endcode
+
+Will output {\tt Adding two Foo instances}.
+
+\beginscare
+An operator overload is also a method, so for example the name of the one above is {\tt\string\Foo::+}.
+At first, implementing this may seem like a breeze, or at least similar to implementing {\tt\string\method}.
+The issue is when you have code like {\tt\string\foo + \string\self.\string\foo}, you somehow need to first parse
+the {\tt\string\self.\string\foo} into {\tt\string\instance::foo} and then pass it to the operator.
+In order to do this, it utilizes the same process used for construction.
+As a result of this, the justified name of {\tt\string\other} is stored in the register
+{\tt\string\tpp@instance@name} upon calling the operator.
+\endscare
+
+\OoP{} also provides a (minimal as of now) standard library with predefined classes, the String and Num class.
+The String class represents a string and can be constructed, assigned (operator =), concatenated (operator +), and
+printed (using the {\tt\string\print} method).
+For example:
+
+\begincode
+\String\strA{Hello}
+\String\space{ }
+\String\strB{world!}
+
+\strA + \space
+\strA + \strB
+\strA.\print{}      % Hello world!
+
+\strA = \strB
+\strA.\print{}      % world!
+/endcode
+
+Num represents an integer and can be constructed, added, multiplied, divided, assigned, and printed.
+For example:
+
+\begincode
+\Num\numA{10}
+\Num\numB{7}
+
+\numA * \numB
+\numA.\print{}      % 70
+
+\Num\numC{3}
+\numB /flsash \numC
+\numB.\print{}      % 2 (integer division)
+/endcode
+
+\end
