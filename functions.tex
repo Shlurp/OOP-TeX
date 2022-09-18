@@ -13,12 +13,21 @@
 
 \def\@prepeat#1#2#3{%
     \unless\ifnum#1>#2 %
-        \afterfi#3{#1}%
+        \@afterfi#3{#1}%
         \@xp\@prepeat\@xp{\the\numexpr #1+1\relax}{#2}{#3}%
     \fi%
 }
 
 \def\prepeat#1#2{\@prepeat{1}{#1}{#2}}
+
+\def\@repeatit#1#2#3{%
+    \unless\ifnum#1>#2 %
+        \@afterfi#3%
+        \@xp\@repeatit\@xp{\the\numexpr #1+1\relax}{#2}{#3}%
+    \fi%
+}
+
+\def\repeatit#1#2{\@repeatit{1}{#1}{#2}}
 
 % Construct an empty primitive array
 % @param #1:    The name of the array
@@ -83,23 +92,52 @@
 
 \def\@create@param@list#1{\prepeat{#1}{\literal##1{#####1}}}
 
+\def\@scope@stack@count{0}
+\def\@scope@stack@def@count{0}
+
+\def\@scope@stack@push#1{%
+    \@xp\edef\csname @scope@stack@element@\@scope@stack@count\endcsname{\m@strip#1}%
+    \@xp\let\csname @scope@stack@def@\@scope@stack@count\endcsname=#1%
+    \edef\@scope@stack@count{\the\numexpr \@scope@stack@count + 1\relax}%
+    \edef\@scope@stack@def@count{\the\numexpr \@scope@stack@def@count + 1\relax}%
+}
+
+\def\@scope@stack@pop{%
+    \edef\@scope@stack@count{\the\numexpr \@scope@stack@count - 1\relax}%
+    \def\@tpp@temp{\@xp\let\csname \csname @scope@stack@element@\@scope@stack@count\endcsname\endcsname}%
+    \@xp\@tpp@temp\csname @scope@stack@def@\@scope@stack@count\endcsname%
+    \@xp\let\csname @scope@stack@element@\@scope@stack@count\endcsname=\undefined%
+    \@xp\let\csname @scope@stack@def@\@scope@stack@count\endcsname=\undefined%
+    \edef\@scope@stack@def@count{\the\numexpr \@scope@stack@def@count - 1\relax}%
+}
+
+% Localizes a definition to the current scope
+% @param #1#2       a macro definition like \def\foo
+\def\localize#1#2{\@scope@stack@push{#2}#1#2}
+
+\def\beginscope{%
+    \@scope@stack@push\@scope@stack@def@count%
+    \def\@scope@stack@def@count{1}%
+}
+
+\def\endscope{%
+    \message{Popping \@scope@stack@def@count\ elements}%
+    \repeatit{\@scope@stack@def@count}{\@scope@stack@pop}%
+}
+
 \long\def\function#1#2#3{%
     \p@array@init{\m@strip#1@param@list}{#2}%
-    \def#1##1{%
+    \def#1##1{\beginscope%
         \p@array@init{\m@strip#1@param@call@list}{##1}%
         \count1=0 %
         \def\@iterator@temp####1{%
             \p@array@index{\m@strip#1@param@call@list}{\count1}%
             \advance\count1 by 1 %
-            \@xp\let\csname @tpp@old@\m@strip####1\endcsname=####1%
-            \let####1=\tpp@return%
+            \localize\let####1\tpp@return%
         }%
         \let\p@exe=\@iterator@temp%
         \csname p@array@\m@strip#1@param@list\endcsname%
         #3%
-        \def\@iterator@temp####1{\@xp\let\@xp####1\csname @tpp@old@\m@strip####1\endcsname}%
-        \let\p@exe=\@iterator@temp%
-        \csname p@array@\m@strip#1@param@list\endcsname%
-    }%
+    \endscope}%
 }
 

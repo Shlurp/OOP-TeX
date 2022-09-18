@@ -41,9 +41,13 @@
     %\expanded{\unexpanded{\csname \m@strip#1@contr\endcsname}{\csname \tpp@instance@name\endcsname}}%
 }
 
+\newif\if@tpp@local
+\def\local{\@tpp@localtrue}
+
 \def\class#1{%
     \@xp\let\csname \m@strip#1::\m@strip#1\endcsname=\@gobble%
     \@xp\def\csname \m@strip#1@contr\endcsname##1##2{%
+        \if@tpp@local \@scope@stack@push{##1}\fi%
         \def##1{%
             \@ifnextchar. {\@member@call{\m@strip#1}{\m@strip##1}}%
                           {%

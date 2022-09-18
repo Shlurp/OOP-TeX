@@ -73,7 +73,7 @@
 \advance\vsize by -2\voffset
 
 \title{Object Oriented \TeX: \OoP\par}
-\hfill \OoP\ {\it v0.0.2}\par
+\hfill \OoP\ {\it v0.0.3}\par
 
 \section{An Introduction}
 
@@ -165,6 +165,89 @@ Hopefully this will change in the future.
 The arrays used here are what I called ``primitive arrays'', or {\tt p@array}s.
 Their implementation is similar to Knuth's implementation in Appendix D of his \TeX book.
 All the code for this can be found in {\tt functions.tex}.
+\endscare
+
+\subsection{Scoping}
+
+While \TeX\ provides a primitive notion of scoping through grouping, many times this is not sufficient.
+The main issue with grouping is that either every change is global or local, there is no in between.
+Suppose you'd like to \TeX\ something similar to:
+
+\begincode
+string foo = "foo";
+{
+    string foo = "bar";
+    {
+        foo = "bam";
+        print(foo);
+    }
+    print(foo);
+}
+print(foo);
+/endcode
+
+This should print {\tt``bam bam foo''}.
+But if we were to do something similar in \TeX:
+
+\begincode
+\def\foo{foo}%
+{%
+    \def\foo{bar}%
+    {%
+        \def\foo{bam}%
+        \foo\ 
+    }%
+    \foo\ 
+}%
+\foo
+/endcode
+
+This will print {\tt``bam bar foo''}.
+Adding {\tt\string\global} before the innermost {\tt\string\def} will output {\tt``bam bam bam''}.
+
+Therefore \OoP provides two macros: {\tt\string\beginscope} and {\tt\string\endscope} which provide scoping for macro definitions.
+They are similar to \TeX's grouping macros and characters, but definitions inside the scope are local to the current group,
+unless specified that they should be local to the current scope.
+You can specify this with the {\tt\string\localize} macro before a macro definition ({\tt\string\def, \string\let,} etc).
+So we can convert the above code to:
+
+\begincode
+\def\foo{foo}%
+\beginscope%
+    \localize\def\foo{bar}%
+    \beginscope%
+        \def\foo{bam}%
+        \foo\ 
+    \endscope%
+    \foo\ 
+\endscope
+\foo
+/endcode
+
+And this will output {\tt``bam bam foo''} just like it should.
+
+\beginscare
+Scoping is implemented through a stack.
+When you {\tt\string\localize} a macro, its name and definition are pushed onto the stack, and a counter for the number of elements
+in the current scope is incremented.
+When you begin a scope, this counter is pushed onto the stack and set to $1$, and when you end a scope if the counter is $N$, then
+$N$ elements are popped from the stack, and the macros are redefined according to their previous definition.
+
+Now, while this may seem simple, the question arises of how to implement such a stack.
+The real issue is how you push the definition of the macro onto the stack.
+Therefore the stack is implemented more as a map than a stack.
+
+\OoP stores two counters relating to the stack: the {\it global stack counter} and the {\tt local stack counter}.
+The local stack counter is the counter discussed above, it counts the number of macros on the stack in the current scope.
+The global stack counter is the number of macros on the stack as a whole.
+Suppose the global counter is $G$ and the local counter is $L$.
+
+When a macro {\tt\string\foo} is {\tt\string\localized}, two new macros are created: {\tt\string\@scope@stack@element@{\it G}}
+which is set to {\tt foo}, and {\tt\string\@scope@stack@def@{\it G}} which is let to be equal to {\tt\string\foo}.
+Then $G$ and $L$ are incremented.
+When you call {\tt\string\endscope}, $L$ elements are popped off the stack, that means that we let the macro whose name is
+{\tt\string\@scope@stack@element@{\it N}} to be {\tt\string\@scope@stack@def@{\it N}} for $N$ between $G-1$ and $G-L$.
+Note that since $L$ is pushed onto the stack at the beginning of a scope, this reverts it to its previous definition as well.
 \endscare
 
 \subsection{Classes and Objects}
